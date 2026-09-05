@@ -1,36 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr, HttpUrl
-from typing import Optional
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import Base, engine, get_db
+from app.models import SubmissionDB
+from app.schemas import SubmissionCreate, SubmissionRead
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CodeJam Backend API")
-
-
-class SubmissionCreate(BaseModel):
-    team_name: str
-    team_members: str
-    contact_email: EmailStr
-    project_title: str
-    description: str
-    category: str
-    project_url: HttpUrl
-    github_url: Optional[HttpUrl] = None
-    demo_video_url: Optional[HttpUrl] = None
-
-
-class Submission(SubmissionCreate):
-    id: int
-
-
-submissions: list[Submission] = []
-next_submission_id = 1
-
 
 @app.get("/")
 def root():
     return {
         "message": "CodeJam Backend API is running"
     }
-
 
 @app.get("/health")
 def health_check():
@@ -39,30 +22,39 @@ def health_check():
     }
 
 
-@app.post("/submissions")
-def create_submission(submission_data: SubmissionCreate):
-    global next_submission_id
-
-    new_submission = Submission(
-        id=next_submission_id,
-        **submission_data.model_dump()
+@app.post("/submissions", response_model=SubmissionRead)
+def create_submission(
+    submission_data: SubmissionCreate,
+    db: Session = Depends(get_db)
+):
+    new_submission = SubmissionDB(
+        **submission_data.model_dump(mode="json")
     )
 
-    submissions.append(new_submission)
-    next_submission_id += 1
+    db.add(new_submission)
+    db.commit()
+    db.refresh(new_submission)
 
     return new_submission
 
 
-@app.get("/submissions")
-def get_submissions():
-    return submissions
+@app.get("/submissions", response_model=list[SubmissionRead])
+def get_submissions(db: Session = Depends(get_db)):
+    return db.query(SubmissionDB).all()
 
 
-@app.get("/submissions/{submission_id}")
-def get_submission(submission_id: int):
-    for submission in submissions:
-        if submission.id == submission_id:
-            return submission
+@app.get("/submissions/{submission_id}", response_model=SubmissionRead)
+def get_submission(
+    submission_id: int,
+    db: Session = Depends(get_db)
+):
+    submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.id == submission_id)
+        .first()
+    )
 
-    raise HTTPException(status_code=404, detail="Submission not found")
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    return submission
