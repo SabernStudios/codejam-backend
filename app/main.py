@@ -9,6 +9,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CodeJam Backend API")
 
+
 @app.get("/")
 def root():
     return {
@@ -20,7 +21,6 @@ def health_check():
     return {
         "status": "ok"
     }
-
 
 @app.post("/submissions", response_model=SubmissionRead)
 def create_submission(
@@ -37,11 +37,9 @@ def create_submission(
 
     return new_submission
 
-
 @app.get("/submissions", response_model=list[SubmissionRead])
 def get_submissions(db: Session = Depends(get_db)):
     return db.query(SubmissionDB).all()
-
 
 @app.get("/submissions/{submission_id}", response_model=SubmissionRead)
 def get_submission(
