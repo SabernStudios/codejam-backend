@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Text
 
 from app.database import Base
 
@@ -15,3 +15,17 @@ class SubmissionDB(Base):
     project_url = Column(String, nullable=False)
     github_url = Column(String, nullable=True)
     demo_video_url = Column(String, nullable=True)
+
+class ScoreDB(Base):
+    __tablename__ = "scores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False)
+    judge_name = Column(String, nullable=False)
+
+    creativity = Column(Integer, nullable=False)
+    functionality = Column(Integer, nullable=False)
+    technical_effort = Column(Integer, nullable=False)
+    presentation = Column(Integer, nullable=False)
+
+    comments = Column(Text, nullable=True)
