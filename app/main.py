@@ -1,10 +1,13 @@
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.database import Base, engine, get_db
 from app.models import SubmissionDB, ScoreDB
 from app.schemas import (
     SubmissionCreate, 
+    SubmissionUpdate,
     SubmissionRead, 
     ScoreCreate, 
     ScoreRead, 
@@ -14,6 +17,18 @@ from app.schemas import (
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CodeJam Backend API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
@@ -59,6 +74,34 @@ def get_submission(
 
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission not found")
+
+    return submission
+
+@app.put("/submissions/{submission_id}", response_model=SubmissionRead)
+def update_submission(
+    submission_id: int,
+    submission_data: SubmissionUpdate,
+    db: Session = Depends(get_db)
+):
+    submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.id == submission_id)
+        .first()
+    )
+
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    update_data = submission_data.model_dump(
+        exclude_unset=True,
+        mode="json"
+    )
+
+    for field, value in update_data.items():
+        setattr(submission, field, value)
+
+    db.commit()
+    db.refresh(submission)
 
     return submission
 

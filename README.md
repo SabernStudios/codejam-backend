@@ -28,3 +28,11 @@ http://127.0.0.1:8000/docs
 
 GET /
 GET /health
+
+## API Documentation
+
+API contract for frontend integration is in:
+docs/API_CONTRACT.md
+
+Interactive API docs available on:
+http://127.0.0.1:8000/docs

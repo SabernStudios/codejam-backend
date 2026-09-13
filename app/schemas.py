@@ -13,6 +13,16 @@ class SubmissionCreate(BaseModel):
     github_url: Optional[HttpUrl] = None
     demo_video_url: Optional[HttpUrl] = None
 
+class SubmissionUpdate(BaseModel):
+    team_name: Optional[str] = None
+    team_members: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    project_title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    project_url: Optional[HttpUrl] = None
+    github_url: Optional[HttpUrl] = None
+    demo_video_url: Optional[HttpUrl] = None
 
 class SubmissionRead(BaseModel):
     id: int
