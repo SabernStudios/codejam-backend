@@ -21,7 +21,7 @@ def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return password_hash.verify(plain_password, hash_password)
+    return password_hash.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()

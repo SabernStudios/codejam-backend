@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 
 from app.database import Base, engine, get_db
 from app.models import SubmissionDB, ScoreDB, UserDB
@@ -267,6 +268,12 @@ def register_user(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
+    if not user_data.username or not user_data.password:
+        raise HTTPException(
+            status_code=400,
+            detail="Username and password are required"
+        )
+
     existing_user = (
         db.query(UserDB)
         .filter(UserDB.username == user_data.username)
@@ -281,7 +288,7 @@ def register_user(
 
     new_user = UserDB(
         username=user_data.username,
-        password_hash=hash_password(user_data),
+        password_hash=hash_password(user_data.password),
         role="student"
     )
 
@@ -293,12 +300,12 @@ def register_user(
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login_user(
-    login_data: LoginRequest,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     user = (
         db.query(UserDB)
-        .filter(UserDB.username == login_data.username)
+        .filter(UserDB.username == form_data.username)
         .first()
     )
 
@@ -308,7 +315,7 @@ def login_user(
             detail="Invalid username or password"
         )
 
-    if not verify_password(login_data.password, user.password_hash):
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=401,
             detail="Invalid username or password"

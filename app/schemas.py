@@ -26,6 +26,7 @@ class SubmissionUpdate(BaseModel):
 
 class SubmissionRead(BaseModel):
     id: int
+    user_id: int
     team_name: str
     team_members: str
     contact_email: str
@@ -74,3 +75,24 @@ class LeaderboardItem(BaseModel):
     average_presentation: float
     total_score: float
     number_of_scores: int
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserRead(BaseModel):
+    id: int
+    username: str
+    role: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    username: str
+    role: str
