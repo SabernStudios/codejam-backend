@@ -6,6 +6,15 @@ class SubmissionDB(Base):
     __tablename__ = "submissions"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+    
     team_name = Column(String, nullable=False)
     team_members = Column(Text, nullable=False)
     contact_email = Column(String, nullable=False)
@@ -29,3 +38,11 @@ class ScoreDB(Base):
     presentation = Column(Integer, nullable=False)
 
     comments = Column(Text, nullable=True)
+
+class UserDB(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="student")

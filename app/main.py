@@ -4,14 +4,25 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine, get_db
-from app.models import SubmissionDB, ScoreDB
+from app.models import SubmissionDB, ScoreDB, UserDB
 from app.schemas import (
-    SubmissionCreate, 
+    SubmissionCreate,
     SubmissionUpdate,
-    SubmissionRead, 
-    ScoreCreate, 
-    ScoreRead, 
-    LeaderboardItem
+    SubmissionRead,
+    ScoreCreate,
+    ScoreRead,
+    LeaderboardItem,
+    UserCreate,
+    UserRead,
+    LoginRequest,
+    TokenResponse,
+)
+from app.auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    require_judge_or_admin,
+    verify_password,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -45,9 +56,23 @@ def health_check():
 @app.post("/submissions", response_model=SubmissionRead)
 def create_submission(
     submission_data: SubmissionCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
 ):
+    existing_submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.user_id == current_user.id)
+        .first()
+    )
+
+    if existing_submission is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="This account already has a submission"
+        )
+
     new_submission = SubmissionDB(
+        user_id=current_user.id,
         **submission_data.model_dump(mode="json")
     )
 
@@ -74,6 +99,56 @@ def get_submission(
 
     if submission is None:
         raise HTTPException(status_code=404, detail="Submission not found")
+
+    return submission
+
+@app.get("/submissions/me", response_model=SubmissionRead)
+def get_my_submission(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.user_id == current_user.id)
+        .first()
+    )
+
+    if submission is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No submission found for this account"
+        )
+
+    return submission
+
+@app.put("/submissions/me", response_model=SubmissionRead)
+def update_my_submission(
+    submission_data: SubmissionUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.user_id == current_user.id)
+        .first()
+    )
+
+    if submission is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No submission found for this account"
+        )
+
+    update_data = submission_data.model_dump(
+        exclude_unset=True,
+        mode="json"
+    )
+
+    for field, value in update_data.items():
+        setattr(submission, field, value)
+
+    db.commit()
+    db.refresh(submission)
 
     return submission
 
@@ -108,7 +183,8 @@ def update_submission(
 @app.post("/scores", response_model=ScoreRead)
 def create_score(
     score_data: ScoreCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(require_judge_or_admin)
 ):
     submission = (
         db.query(SubmissionDB)
@@ -185,3 +261,73 @@ def get_leaderboard(db: Session = Depends(get_db)):
         )
 
         leaderboard.sort(key=lambda item: item.total_score, reverse=True)
+
+@app.post("/auth/register", response_model=UserRead)
+def register_user(
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
+    existing_user = (
+        db.query(UserDB)
+        .filter(UserDB.username == user_data.username)
+        .first()
+    )
+
+    if existing_user is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Username already taken"
+        )
+
+    new_user = UserDB(
+        username=user_data.username,
+        password_hash=hash_password(user_data),
+        role="student"
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login_user(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(UserDB)
+        .filter(UserDB.username == login_data.username)
+        .first()
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    if not verify_password(login_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    token = create_access_token(
+        data={
+            "sub": user.username,
+            "role": user.role
+        }
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user.username,
+        "role": user.role
+    }
+
+@app.get("/auth/me", response_model=UserRead)
+def get_me(current_user: UserDB = Depends(get_current_user)):
+    return current_user
