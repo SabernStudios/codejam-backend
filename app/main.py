@@ -335,6 +335,6 @@ def login_user(
         "role": user.role
     }
 
-@app.get("/auth/me", response_model=UserRead)
+@app.get("/me", response_model=UserRead)
 def get_me(current_user: UserDB = Depends(get_current_user)):
     return current_user
