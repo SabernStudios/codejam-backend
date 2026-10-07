@@ -45,7 +45,7 @@ class ScoreCreate(BaseModel):
 
     creativity: int = Field(ge=1, le=10)
     functionality: int = Field(ge=1, le=10)
-    technical_effor: int = Field(ge=1, le=10)
+    technical_effort: int = Field(ge=1, le=10)
     presentation: int = Field(ge=1, le=10)
 
     comments: Optional[str] = None
@@ -53,7 +53,7 @@ class ScoreCreate(BaseModel):
 class ScoreRead(BaseModel):
     id: int
     submission_id: int
-    judge_nam: str
+    judge_name: str
 
     creativity: int
     functionality: int
@@ -77,11 +77,13 @@ class LeaderboardItem(BaseModel):
     number_of_scores: int
 
 class UserCreate(BaseModel):
+    name: str
     username: str
     password: str
 
 class UserRead(BaseModel):
     id: int
+    name: str
     username: str
     role: str
 
