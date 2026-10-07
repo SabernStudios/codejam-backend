@@ -90,22 +90,6 @@ def create_submission(
 def get_submissions(db: Session = Depends(get_db)):
     return db.query(SubmissionDB).all()
 
-@app.get("/submissions/{submission_id}", response_model=SubmissionRead)
-def get_submission(
-    submission_id: int,
-    db: Session = Depends(get_db)
-):
-    submission = (
-        db.query(SubmissionDB)
-        .filter(SubmissionDB.id == submission_id)
-        .first()
-    )
-
-    if submission is None:
-        raise HTTPException(status_code=404, detail="Submission not found")
-
-    return submission
-
 @app.get("/submissions/me", response_model=SubmissionRead)
 def get_my_submission(
     db: Session = Depends(get_db),
@@ -122,6 +106,22 @@ def get_my_submission(
             status_code=404,
             detail="No submission found for this account"
         )
+
+    return submission
+
+@app.get("/submissions/{submission_id}", response_model=SubmissionRead)
+def get_submission(
+    submission_id: int,
+    db: Session = Depends(get_db)
+):
+    submission = (
+        db.query(SubmissionDB)
+        .filter(SubmissionDB.id == submission_id)
+        .first()
+    )
+
+    if submission is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
 
     return submission
 
@@ -264,17 +264,18 @@ def get_leaderboard(db: Session = Depends(get_db)):
             )
         )
 
-        leaderboard.sort(key=lambda item: item.total_score, reverse=True)
+    leaderboard.sort(key=lambda item: item.total_score, reverse=True)
+    return leaderboard
 
 @app.post("/auth/register", response_model=UserRead)
 def register_user(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
-    if not user_data.username or not user_data.password:
+    if not user_data.name or not user_data.username or not user_data.password:
         raise HTTPException(
             status_code=400,
-            detail="Username and password are required"
+            detail="Name, username, and password are required"
         )
 
     existing_user = (
@@ -290,6 +291,7 @@ def register_user(
         )
 
     new_user = UserDB(
+        name=user_data.name,
         username=user_data.username,
         password_hash=hash_password(user_data.password),
         role="student"
