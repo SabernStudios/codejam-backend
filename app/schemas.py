@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
 
 
 class SubmissionCreate(BaseModel):
+    participant_type: str = "individual"
     team_name: str
     team_members: str
     contact_email: EmailStr
@@ -17,6 +18,7 @@ class SubmissionCreate(BaseModel):
 
 
 class SubmissionUpdate(BaseModel):
+    participant_type: Optional[str] = None
     team_name: Optional[str] = None
     team_members: Optional[str] = None
     contact_email: Optional[EmailStr] = None
@@ -31,6 +33,7 @@ class SubmissionUpdate(BaseModel):
 class SubmissionRead(BaseModel):
     id: int
     user_id: int
+    participant_type: str = "individual"
     team_name: str
     team_members: str
     contact_email: str
@@ -76,7 +79,9 @@ class ScoreRead(BaseModel):
 class LeaderboardItem(BaseModel):
     submission_id: int
     project_title: str
+    participant_type: str = "individual"
     team_name: str
+    team_members: str
     category: str
     average_creativity: float
     average_functionality: float
