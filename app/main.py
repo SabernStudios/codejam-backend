@@ -67,9 +67,14 @@ def ensure_database_schema():
                 "ALTER TABLE scores "
                 "ADD COLUMN IF NOT EXISTS user_experience INTEGER DEFAULT 1 NOT NULL"
             ))
+            connection.execute(text(
+                "ALTER TABLE submissions "
+                "ADD COLUMN IF NOT EXISTS participant_type VARCHAR DEFAULT 'individual' NOT NULL"
+            ))
         elif engine.dialect.name == "sqlite":
             user_columns = [row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()]
             score_columns = [row[1] for row in connection.execute(text("PRAGMA table_info(scores)")).fetchall()]
+            submission_columns = [row[1] for row in connection.execute(text("PRAGMA table_info(submissions)")).fetchall()]
 
             if "created_at" not in user_columns:
                 connection.execute(text(
@@ -87,6 +92,12 @@ def ensure_database_schema():
                 connection.execute(text(
                     "ALTER TABLE scores "
                     "ADD COLUMN user_experience INTEGER DEFAULT 1 NOT NULL"
+                ))
+
+            if "participant_type" not in submission_columns:
+                connection.execute(text(
+                    "ALTER TABLE submissions "
+                    "ADD COLUMN participant_type VARCHAR DEFAULT 'individual' NOT NULL"
                 ))
 
 
@@ -149,6 +160,74 @@ def get_submission_or_404(submission_id: int, db: Session) -> SubmissionDB:
     return submission
 
 
+def split_team_members(raw_members: str) -> list[str]:
+    normalized = raw_members.replace("\r", "\n").replace(",", "\n")
+    return [member.strip() for member in normalized.split("\n") if member.strip()]
+
+
+def normalize_submission_payload(
+    submission_data: dict,
+    default_name: str = "Unknown",
+    partial: bool = False
+) -> dict:
+    data = submission_data.copy()
+
+    for field, value in list(data.items()):
+        if isinstance(value, str):
+            data[field] = value.strip()
+
+    participant_type = data.get("participant_type")
+    if participant_type is None:
+        participant_type = "individual"
+    participant_type = str(participant_type).strip().lower()
+
+    if participant_type not in ["individual", "team"]:
+        raise HTTPException(
+            status_code=400,
+            detail="participant_type must be either 'individual' or 'team'"
+        )
+
+    data["participant_type"] = participant_type
+
+    team_name = (data.get("team_name") or default_name).strip()
+    team_members = (data.get("team_members") or team_name).strip()
+    members = split_team_members(team_members)
+
+    if participant_type == "individual":
+        if not team_name:
+            team_name = default_name
+        if not members:
+            members = [team_name]
+        if len(members) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Individual submissions should list one participant. Choose team submission for multiple people."
+            )
+
+        data["team_name"] = team_name
+        data["team_members"] = members[0]
+        return data
+
+    if not team_name:
+        raise HTTPException(status_code=400, detail="Team submissions need a team name")
+
+    if len(members) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Team submissions need at least 2 members"
+        )
+
+    if len(members) > 4:
+        raise HTTPException(
+            status_code=400,
+            detail="Team submissions can have at most 4 members"
+        )
+
+    data["team_name"] = team_name
+    data["team_members"] = "\n".join(members)
+    return data
+
+
 @app.get("/")
 def root():
     return {
@@ -181,9 +260,14 @@ def create_submission(
             detail="This account already has a submission"
         )
 
+    submission_payload = normalize_submission_payload(
+        submission_data.model_dump(mode="json"),
+        default_name=current_user.username
+    )
+
     new_submission = SubmissionDB(
         user_id=current_user.id,
-        **submission_data.model_dump(mode="json")
+        **submission_payload
     )
 
     db.add(new_submission)
@@ -362,6 +446,19 @@ def update_my_submission(
         mode="json"
     )
 
+    if any(field in update_data for field in ["participant_type", "team_name", "team_members"]):
+        merged_data = {
+            "participant_type": update_data.get("participant_type", submission.participant_type),
+            "team_name": update_data.get("team_name", submission.team_name),
+            "team_members": update_data.get("team_members", submission.team_members),
+        }
+        normalized_team_data = normalize_submission_payload(
+            merged_data,
+            default_name=current_user.username,
+            partial=True
+        )
+        update_data.update(normalized_team_data)
+
     for field, value in update_data.items():
         setattr(submission, field, value)
 
@@ -383,6 +480,19 @@ def update_submission(
         exclude_unset=True,
         mode="json"
     )
+
+    if any(field in update_data for field in ["participant_type", "team_name", "team_members"]):
+        merged_data = {
+            "participant_type": update_data.get("participant_type", submission.participant_type),
+            "team_name": update_data.get("team_name", submission.team_name),
+            "team_members": update_data.get("team_members", submission.team_members),
+        }
+        normalized_team_data = normalize_submission_payload(
+            merged_data,
+            default_name=submission.team_name,
+            partial=True
+        )
+        update_data.update(normalized_team_data)
 
     for field, value in update_data.items():
         setattr(submission, field, value)
@@ -460,7 +570,9 @@ def get_leaderboard(db: Session = Depends(get_db)):
             LeaderboardItem(
                 submission_id=submission.id,
                 project_title=submission.project_title,
+                participant_type=submission.participant_type,
                 team_name=submission.team_name,
+                team_members=submission.team_members,
                 category=submission.category,
                 average_creativity=round(average_creativity, 2),
                 average_functionality=round(average_functionality, 2),
