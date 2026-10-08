@@ -52,6 +52,7 @@ class ScoreCreate(BaseModel):
     functionality: int = Field(ge=1, le=10)
     technical_effort: int = Field(ge=1, le=10)
     presentation: int = Field(ge=1, le=10)
+    user_experience: int = Field(ge=1, le=30)
 
     comments: Optional[str] = None
 
@@ -65,6 +66,7 @@ class ScoreRead(BaseModel):
     functionality: int
     technical_effort: int
     presentation: int
+    user_experience: int
 
     comments: Optional[str] = None
 
@@ -80,6 +82,7 @@ class LeaderboardItem(BaseModel):
     average_functionality: float
     average_technical_effort: float
     average_presentation: float
+    average_user_experience: float
     total_score: float
     number_of_scores: int
 
