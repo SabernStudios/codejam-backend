@@ -17,6 +17,7 @@ class SubmissionDB(Base):
         index=True
     )
     
+    participant_type = Column(String, nullable=False, default="individual")
     team_name = Column(String, nullable=False)
     team_members = Column(Text, nullable=False)
     contact_email = Column(String, nullable=False)
