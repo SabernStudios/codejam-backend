@@ -1,6 +1,8 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
+
 
 class SubmissionCreate(BaseModel):
     team_name: str
@@ -13,6 +15,7 @@ class SubmissionCreate(BaseModel):
     github_url: Optional[HttpUrl] = None
     demo_video_url: Optional[HttpUrl] = None
 
+
 class SubmissionUpdate(BaseModel):
     team_name: Optional[str] = None
     team_members: Optional[str] = None
@@ -23,6 +26,7 @@ class SubmissionUpdate(BaseModel):
     project_url: Optional[HttpUrl] = None
     github_url: Optional[HttpUrl] = None
     demo_video_url: Optional[HttpUrl] = None
+
 
 class SubmissionRead(BaseModel):
     id: int
@@ -39,6 +43,7 @@ class SubmissionRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class ScoreCreate(BaseModel):
     submission_id: int
     judge_name: str
@@ -49,6 +54,7 @@ class ScoreCreate(BaseModel):
     presentation: int = Field(ge=1, le=10)
 
     comments: Optional[str] = None
+
 
 class ScoreRead(BaseModel):
     id: int
@@ -64,6 +70,7 @@ class ScoreRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class LeaderboardItem(BaseModel):
     submission_id: int
     project_title: str
@@ -76,25 +83,45 @@ class LeaderboardItem(BaseModel):
     total_score: float
     number_of_scores: int
 
+
 class UserCreate(BaseModel):
     name: str
     username: str
     password: str
+
 
 class UserRead(BaseModel):
     id: int
     name: str
     username: str
     role: str
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     username: str
     role: str
+
+
+class LikeStatus(BaseModel):
+    submission_id: int
+    likes: int
+    liked: bool = False
+    can_like: bool = False
+    reason: Optional[str] = None
+    hours_until_eligible: Optional[int] = None
+
+
+class IpDuplicateReportItem(BaseModel):
+    registration_ip: str
+    account_count: int
+    usernames: list[str]
