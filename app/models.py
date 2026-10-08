@@ -1,6 +1,8 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.sql import func
 
 from app.database import Base
+
 
 class SubmissionDB(Base):
     __tablename__ = "submissions"
@@ -25,6 +27,7 @@ class SubmissionDB(Base):
     github_url = Column(String, nullable=True)
     demo_video_url = Column(String, nullable=True)
 
+
 class ScoreDB(Base):
     __tablename__ = "scores"
 
@@ -39,6 +42,7 @@ class ScoreDB(Base):
 
     comments = Column(Text, nullable=True)
 
+
 class UserDB(Base):
     __tablename__ = "users"
 
@@ -47,3 +51,22 @@ class UserDB(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="student")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    registration_ip = Column(String, nullable=True, index=True)
+
+
+class LikeDB(Base):
+    __tablename__ = "likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("submissions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "submission_id",
+            "user_id",
+            name="unique_like_per_submission_per_user"
+        ),
+    )
