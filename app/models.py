@@ -39,6 +39,7 @@ class ScoreDB(Base):
     functionality = Column(Integer, nullable=False)
     technical_effort = Column(Integer, nullable=False)
     presentation = Column(Integer, nullable=False)
+    user_experience = Column(Integer, nullable=False, default=1)
 
     comments = Column(Text, nullable=True)
 
