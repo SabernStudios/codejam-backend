@@ -63,19 +63,30 @@ def ensure_database_schema():
                 "ALTER TABLE users "
                 "ADD COLUMN IF NOT EXISTS registration_ip VARCHAR"
             ))
+            connection.execute(text(
+                "ALTER TABLE scores "
+                "ADD COLUMN IF NOT EXISTS user_experience INTEGER DEFAULT 1 NOT NULL"
+            ))
         elif engine.dialect.name == "sqlite":
-            columns = [row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()]
+            user_columns = [row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()]
+            score_columns = [row[1] for row in connection.execute(text("PRAGMA table_info(scores)")).fetchall()]
 
-            if "created_at" not in columns:
+            if "created_at" not in user_columns:
                 connection.execute(text(
                     "ALTER TABLE users "
                     "ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL"
                 ))
 
-            if "registration_ip" not in columns:
+            if "registration_ip" not in user_columns:
                 connection.execute(text(
                     "ALTER TABLE users "
                     "ADD COLUMN registration_ip VARCHAR"
+                ))
+
+            if "user_experience" not in score_columns:
+                connection.execute(text(
+                    "ALTER TABLE scores "
+                    "ADD COLUMN user_experience INTEGER DEFAULT 1 NOT NULL"
                 ))
 
 
@@ -388,7 +399,7 @@ def create_score(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(require_judge_or_admin)
 ):
-    submission = get_submission_or_404(score_data.submission_id, db)
+    get_submission_or_404(score_data.submission_id, db)
 
     new_score = ScoreDB(**score_data.model_dump())
 
@@ -435,12 +446,14 @@ def get_leaderboard(db: Session = Depends(get_db)):
         average_functionality = sum(score.functionality for score in scores) / len(scores)
         average_technical_effort = sum(score.technical_effort for score in scores) / len(scores)
         average_presentation = sum(score.presentation for score in scores) / len(scores)
+        average_user_experience = sum(score.user_experience for score in scores) / len(scores)
 
         total_score = (
             average_creativity
             + average_functionality
             + average_technical_effort
             + average_presentation
+            + average_user_experience
         )
 
         leaderboard.append(
@@ -453,6 +466,7 @@ def get_leaderboard(db: Session = Depends(get_db)):
                 average_functionality=round(average_functionality, 2),
                 average_technical_effort=round(average_technical_effort, 2),
                 average_presentation=round(average_presentation, 2),
+                average_user_experience=round(average_user_experience, 2),
                 total_score=round(total_score, 2),
                 number_of_scores=len(scores),
             )
