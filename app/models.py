@@ -72,3 +72,14 @@ class LikeDB(Base):
             name="unique_like_per_submission_per_user"
         ),
     )
+
+
+class EventThemeDB(Base):
+    __tablename__ = "event_themes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    theme = Column(String, nullable=False)
+    subtext = Column(Text, nullable=True)
+    reveal_at = Column(DateTime(timezone=True), nullable=False)
+    is_active = Column(Integer, nullable=False, default=1, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
