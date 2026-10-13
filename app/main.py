@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_db
-from app.models import LikeDB, SubmissionDB, ScoreDB, UserDB
+from app.models import EventThemeDB, LikeDB, SubmissionDB, ScoreDB, UserDB
 from app.schemas import (
     IpDuplicateReportItem,
     LikeStatus,
@@ -17,6 +17,7 @@ from app.schemas import (
     ScoreCreate,
     ScoreRead,
     LeaderboardItem,
+    ThemeRevealStatus,
     UserCreate,
     UserRead,
     LoginRequest,
@@ -48,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+DEFAULT_THEME_REVEAL_AT = datetime(2026, 10, 13, 18, 50, tzinfo=timezone.utc)
 
 
 @app.on_event("startup")
@@ -99,6 +102,37 @@ def ensure_database_schema():
                     "ALTER TABLE submissions "
                     "ADD COLUMN participant_type VARCHAR DEFAULT 'individual' NOT NULL"
                 ))
+
+    ensure_default_theme_event()
+
+
+def ensure_default_theme_event():
+    db = Session(bind=engine)
+
+    try:
+        active_theme = (
+            db.query(EventThemeDB)
+            .filter(EventThemeDB.is_active == 1)
+            .first()
+        )
+
+        if active_theme is None:
+            db.add(EventThemeDB(
+                theme="A New Twist",
+                subtext="Remember, this is open-ended for a reason.",
+                reveal_at=DEFAULT_THEME_REVEAL_AT,
+                is_active=1,
+            ))
+            db.commit()
+    finally:
+        db.close()
+
+
+def as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
 
 
 def get_client_ip(request: Request) -> str | None:
@@ -240,6 +274,34 @@ def health_check():
     return {
         "status": "ok"
     }
+
+
+@app.get("/event/theme", response_model=ThemeRevealStatus)
+def get_event_theme(db: Session = Depends(get_db)):
+    active_theme = (
+        db.query(EventThemeDB)
+        .filter(EventThemeDB.is_active == 1)
+        .order_by(EventThemeDB.id.desc())
+        .first()
+    )
+
+    if active_theme is None:
+        raise HTTPException(status_code=404, detail="Theme reveal is not configured")
+
+    reveal_at = as_utc(active_theme.reveal_at)
+
+    if datetime.now(timezone.utc) < reveal_at:
+        return ThemeRevealStatus(
+            revealed=False,
+            reveal_at=reveal_at,
+        )
+
+    return ThemeRevealStatus(
+        revealed=True,
+        reveal_at=reveal_at,
+        theme=active_theme.theme,
+        subtext=active_theme.subtext,
+    )
 
 
 @app.post("/submissions", response_model=SubmissionRead)
