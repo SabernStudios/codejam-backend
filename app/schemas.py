@@ -129,6 +129,13 @@ class LikeStatus(BaseModel):
     hours_until_eligible: Optional[int] = None
 
 
+class ThemeRevealStatus(BaseModel):
+    revealed: bool
+    reveal_at: datetime
+    theme: Optional[str] = None
+    subtext: Optional[str] = None
+
+
 class IpDuplicateReportItem(BaseModel):
     registration_ip: str
     account_count: int
