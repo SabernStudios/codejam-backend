@@ -583,14 +583,18 @@ def create_score(
 
 
 @app.get("/scores", response_model=list[ScoreRead])
-def get_scores(db: Session = Depends(get_db)):
+def get_scores(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(require_judge_or_admin),
+):
     return db.query(ScoreDB).all()
 
 
 @app.get("/scores/submission/{submission_id}", response_model=list[ScoreRead])
 def get_scores_for_submission(
     submission_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(require_judge_or_admin),
 ):
     return (
         db.query(ScoreDB)
