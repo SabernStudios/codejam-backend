@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +52,19 @@ app.add_middleware(
 )
 
 DEFAULT_THEME_REVEAL_AT = datetime(2026, 10, 13, 18, 50, tzinfo=timezone.utc)
+
+# The deadline is exclusive: 11:59:59 PM EDT on Oct 27 is open;
+# 12:00:00 AM EDT on Oct 28 and all later times are closed.
+SUBMISSIONS_CLOSE_AT = datetime(2026, 10, 28, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+
+
+def require_submissions_open():
+    if datetime.now(timezone.utc) >= SUBMISSIONS_CLOSE_AT:
+        raise HTTPException(
+            status_code=403,
+            detail="CodeJam submissions closed at 12:00 AM Eastern on October 28, 2026."
+        )
+
 
 
 @app.on_event("startup")
@@ -304,12 +318,23 @@ def get_event_theme(db: Session = Depends(get_db)):
     )
 
 
+@app.get("/event/submissions-status")
+def get_submissions_status():
+    now = datetime.now(timezone.utc)
+    return {
+        "open": now < SUBMISSIONS_CLOSE_AT,
+        "closes_at": SUBMISSIONS_CLOSE_AT.isoformat(),
+        "server_time": now.isoformat(),
+    }
+
+
 @app.post("/submissions", response_model=SubmissionRead)
 def create_submission(
     submission_data: SubmissionCreate,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
+    require_submissions_open()
     existing_submission = (
         db.query(SubmissionDB)
         .filter(SubmissionDB.user_id == current_user.id)
@@ -333,6 +358,7 @@ def create_submission(
     )
 
     db.add(new_submission)
+    require_submissions_open()
     db.commit()
     db.refresh(new_submission)
 
@@ -491,6 +517,7 @@ def update_my_submission(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
+    require_submissions_open()
     submission = (
         db.query(SubmissionDB)
         .filter(SubmissionDB.user_id == current_user.id)
@@ -524,6 +551,7 @@ def update_my_submission(
     for field, value in update_data.items():
         setattr(submission, field, value)
 
+    require_submissions_open()
     db.commit()
     db.refresh(submission)
 
@@ -536,6 +564,7 @@ def update_submission(
     submission_data: SubmissionUpdate,
     db: Session = Depends(get_db)
 ):
+    require_submissions_open()
     submission = get_submission_or_404(submission_id, db)
 
     update_data = submission_data.model_dump(
@@ -559,6 +588,7 @@ def update_submission(
     for field, value in update_data.items():
         setattr(submission, field, value)
 
+    require_submissions_open()
     db.commit()
     db.refresh(submission)
 
